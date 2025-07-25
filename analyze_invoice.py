@@ -207,7 +207,17 @@ def analyze_invoice_from_pdf(bytes_data: bytes):
     output_strs = ""
     td = {}
     images = []
-    for i, img_bytes in enumerate(pdf_bytes_to_images(bytes_data), start=1):
+
+    pages = list(pdf_bytes_to_images(bytes_data))
+    max_pages = 5
+    if len(pages) > max_pages:
+        # OPTION A (recommended): process only first N pages
+        st.warning(f"PDF has {len(pages)} pages; only the first {max_pages} will be analyzed.")
+        pages = pages[:max_pages]
+
+
+
+    for i, img_bytes in enumerate(pages, start=1):
         print(f"\n--- Analyzing page {i} ---")
         st.write(f"--- Analyzing page {i} ---")
         images.append(img_bytes)
