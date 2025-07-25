@@ -5,7 +5,7 @@ import time
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from openai import AzureOpenAI
-from analyze_invoice import analyze_invoice_from_pdf
+from analyze_invoice import analyze_invoice_from_pdf, analyze_invoice_any
 import base64
 # ------------------
 # ENV + CLIENTS
@@ -142,7 +142,11 @@ if uploaded:
     ):
         raw = uploaded.read()
         st.info("Extracting invoice via Azure Document Intelligence…")
-        invoice_text, fields, images = analyze_invoice_from_pdf(raw)
+        # invoice_text, fields, images = analyze_invoice_from_pdf(raw)
+        # invoice_text, fields, images = analyze_invoice_file(raw, uploaded.name)
+        invoice_text, fields, images = analyze_invoice_any(raw, filename=uploaded.name, mime=uploaded.type)
+
+
         if fields is None:
             st.error("Could not extract invoice fields.")
             st.stop()

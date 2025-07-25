@@ -5,9 +5,8 @@ from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 import json
 import streamlit as st
-
-
-
+import io
+from PIL import Image
 
 load_dotenv()
 
@@ -171,6 +170,39 @@ def process_tables_to_string(table_dict):
 
     return "\n\n".join(result_lines)
 
+
+def analyze_invoice_from_image(bytes_data: bytes):
+    """
+    Handles single-page image uploads (png/jpg/jpeg) and returns the same
+    shape as analyze_invoice_from_pdf: (output_strs, td, images[list[bytes]])
+    """
+    td = {}
+    images = []
+
+    # Normalize to PNG bytes (Azure DI is fine with PNG/JPEG, this just standardizes)
+    img = Image.open(io.BytesIO(bytes_data)).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+    images.append(img_bytes)
+
+    st.write("--- Analyzing image ---")
+    result = analyze_invoice_image(img_bytes)
+    result_json = result.as_dict()
+    table_dict = get_table_dict(result_json)
+    if not isinstance(table_dict, dict) or not table_dict:
+        st.write("table_dict is either not a dict or is empty")
+        table_dict = {}
+    else:
+        st.write("table_dict is a non-empty dict")
+
+    output_str = process_tables_to_string(table_dict)
+    output_strs = f"\n\n--- Image ---\n{output_str}"
+    td = {**td, **table_dict}
+
+    return output_strs, td, images
+
+
 def analyze_invoice_from_pdf(bytes_data: bytes):
     output_strs = ""
     td = {}
@@ -193,3 +225,22 @@ def analyze_invoice_from_pdf(bytes_data: bytes):
         output_strs += f"\n\n--- Page {i} ---\n{output_str}"
     
     return output_strs,td,images
+
+def analyze_invoice_any(bytes_data: bytes, filename: str | None = None, mime: str | None = None):
+    """
+    Decide whether it's a PDF or an image and call the appropriate function.
+    Returns (invoice_text, fields, images)
+    """
+    is_pdf = False
+    if filename and filename.lower().endswith(".pdf"):
+        is_pdf = True
+    elif mime and mime.startswith("application/pdf"):
+        is_pdf = True
+    else:
+        # Fallback sniff: PDF files start with %PDF
+        is_pdf = bytes_data[:4] == b"%PDF"
+
+    if is_pdf:
+        return analyze_invoice_from_pdf(bytes_data)
+    else:
+        return analyze_invoice_from_image(bytes_data)
